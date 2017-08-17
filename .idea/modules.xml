@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file:///m2/akira/AndroidStudioProjects/ping/app/app.iml" filepath="/m2/akira/AndroidStudioProjects/ping/app/app.iml" />
+      <module fileurl="file:///m2/akira/AndroidStudioProjects/ping/ping.iml" filepath="/m2/akira/AndroidStudioProjects/ping/ping.iml" />
+    </modules>
+  </component>
+</project>
