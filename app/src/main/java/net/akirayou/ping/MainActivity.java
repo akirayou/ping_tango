@@ -23,6 +23,8 @@ import com.google.atap.tangoservice.TangoPointCloudData;
 import com.google.atap.tangoservice.TangoPoseData;
 import com.projecttango.tangosupport.TangoPointCloudManager;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -169,13 +171,28 @@ public class MainActivity extends AppCompatActivity {
     }
     private Timer timer ;
     private AudioTrack player ;
-    private final int chunkLen=44100/5;
-
+    private final int chunkLen=44100/3;
+    private byte[][] wav=new byte[5][];
     private MonitorView monitorView;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        InputStream input;
+        int[] rr={R.raw.a,R.raw.i,R.raw.u,R.raw.e,R.raw.o};
+        for(int i=0;i<5;i++) {
+            try {
+                input = getResources().openRawResource(rr[i]);
+                wav[i] = new byte[(int) input.available()];
+                input.read(wav[i]);
+                input.close();
+                for(int j=0;j<wav[i].length;j++)wav[i][j]+=128;
+            }
+            catch (IOException e){
+                Log.e(TAG,"Io exception onCreate");
+            }
+        }
+
 
 
         player = new AudioTrack.Builder()
@@ -203,8 +220,8 @@ public class MainActivity extends AppCompatActivity {
 
 
     private float lenToHz(float len){
-        final float maxHz=1000;
-        final float minHz=40;
+        final float maxHz=500;
+        final float minHz=60;
         final float maxLen=2.0f;
         final float minLen=0.2f;
         if(len<minLen)return maxHz;
@@ -250,7 +267,7 @@ public class MainActivity extends AppCompatActivity {
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                final int noteLen=2*chunkLen/4;
+                final int noteLen=7*chunkLen/8;
 
                 //Log.i("TIMERLOOP","kick");
                 final float[] len=getLen();
@@ -275,11 +292,22 @@ public class MainActivity extends AppCompatActivity {
                 );*/
 
                 float phase=0;
+                int oldId=-1;
+                float pos=0;
                 for(int i=0;i<noteLen;i++) {
                     int id=nofLen*i/noteLen;
+                    if(oldId!=id) {//newData
+                        pos=0;
+                        oldId=id;
+                    }
+                    /*
                     audioBuff[i]=(byte)((phase<0.5)?-50:50);
                     phase+=1.0f/44100*hz[id];
                     phase-=Math.floor(phase);
+                    */
+                    audioBuff[i]=wav[id][(int)pos];
+                    pos+=hz[id]/100.0f;
+                    if(wav[id].length<=pos)pos=0;
                 }
                 for(int i=noteLen;i<chunkLen;i++) audioBuff[i]=0;
 
