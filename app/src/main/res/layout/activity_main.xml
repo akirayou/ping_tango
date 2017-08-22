@@ -16,4 +16,15 @@
         app:layout_constraintVertical_bias="0.0"
         android:layout_marginLeft="13dp"
         app:layout_constraintLeft_toLeftOf="parent" />
+
+    <TextView
+        android:id="@+id/tx_pose"
+        android:layout_width="566dp"
+        android:layout_height="48dp"
+        android:layout_marginLeft="8dp"
+        android:layout_marginTop="8dp"
+        android:text="TextView"
+        android:textSize="10sp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/monitor_view" />
 </android.support.constraint.ConstraintLayout>

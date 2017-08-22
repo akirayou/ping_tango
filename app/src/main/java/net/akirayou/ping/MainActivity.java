@@ -10,6 +10,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.atap.tangoservice.Tango;
@@ -29,15 +30,18 @@ import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import javax.vecmath.Quat4d;
+
 import static java.lang.Math.min;
 
 public class MainActivity extends AppCompatActivity {
     private final String TAG="MainActivity";
-
+    private final float predictInSec=1.0f;
 
 
 
     //Camera request for Tango preview
+
     private void requestCameraPermission() {
         final int REQUEST_CODE_CAMERA_PERMISSION = 0x01;
         if (ActivityCompat.shouldShowRequestPermissionRationale(this,
@@ -140,6 +144,9 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
+    private double[] acc={0.0,0.0,0.0};
+    private double[] oldTranslation;
+    private double oldTimeStamp=-1;
     private void attachTango() {
         // Lock configuration and connect to Tango.
         // Select coordinate frame pair.
@@ -153,12 +160,54 @@ public class MainActivity extends AppCompatActivity {
         mTango.connectListener(framePairs, new Tango.TangoUpdateCallback() {
             @Override
             public void onPoseAvailable(final TangoPoseData pose) {
+                String accStr="";
+                double relTrans[] = {0.0,0.0,0.0};
+                if(pose.statusCode== pose.POSE_VALID ) {
 
+
+                    double timeSpan = pose.timestamp - oldTimeStamp;
+                    if(oldTimeStamp>0 && timeSpan>0) {
+
+                        for(int i =0 ;i<3;i++) {
+                            relTrans[i]=pose.translation[i]-oldTranslation[i];
+                        }
+                        Quat4d src=new Quat4d();
+                        src.setX(relTrans[0]);
+                        src.setY(relTrans[1]);
+                        src.setZ(relTrans[2]);
+                        src.setW(0);
+
+                        Quat4d rot=new Quat4d(pose.rotation[0],pose.rotation[1],pose.rotation[2],pose.rotation[3]);
+                        Quat4d tmp = new Quat4d(rot);
+                        tmp.conjugate();
+                        tmp.mul(src);
+                        tmp.mul(rot);
+                        relTrans[0]=tmp.getX();
+                        relTrans[1]=tmp.getY();
+                        relTrans[2]=tmp.getZ();
+
+                        for (int i = 0; i < 3; i++) {
+                            acc[i] = acc[i] * 0.5 + 0.5 * (relTrans[i] ) / timeSpan;
+                            accStr+=String.format("%+5.4f",acc[i])+" ";
+                        }
+                    }
+                    oldTimeStamp = pose.timestamp;
+                    oldTranslation=pose.translation.clone();
+                }
+                final String str=accStr+pose.toString();
+
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        ((TextView)findViewById(R.id.tx_pose)).setText(str);
+                    }
+                });
             }
 
             @Override
             public void onPointCloudAvailable(TangoPointCloudData pointCloud) {
-                Log.i("TANGO","================-point cloud");
+                //Log.i("TANGO","================-point cloud");
                 tpcm.updatePointCloud(pointCloud);
             }
             @Override
@@ -246,15 +295,29 @@ public class MainActivity extends AppCompatActivity {
         for (int i = 0; i < dataLen; i++) {
             pc.points.get(d);
             if (d[3] < 0.5) continue; // not good data
+
+            if(d[2]<0.02f)d[2]=0.02f;
+
+
             float vang = (float) Math.atan2(d[1], d[2]);
             if(Math.abs(vang)> 30.0/180*Math.PI)continue;
             float len = (float) Math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
             float hang = (float) Math.atan2(d[0], d[2]);
+            if(i==dataLen/2){
+                Log.i(TAG,String.format("%+5.4f %+5.4f %+5.4f  |  %+2.1f %+2.1f %+2.1f ",d[0],d[1],d[2],acc[0],acc[1],acc[2] ));
+            }
+            //predict
+            d[0]-=acc[1]*predictInSec;//x
+            d[1]+=acc[0]*predictInSec;//y (up)
+            d[2]+=acc[2]*predictInSec;//z(forward)
+
+            float lenp = (float) Math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
 
             int id=(int)Math.floor(nofLen*(hang-hmin)/(hmax-hmin));
             if(id<0)id=0;
             if(nofLen<=id)id=nofLen-1;
             minLen[id]=min(len,minLen[id]);
+            minLen[id]=min(lenp,minLen[id]);
         }
         return minLen;
     }
@@ -285,11 +348,10 @@ public class MainActivity extends AppCompatActivity {
 
                 float[] hz= new float[nofLen];
                 for(int i=0;i<nofLen;i++)hz[i]=lenToHz(len[i]);
-/*                Log.i("TIMER LOOP",
+                Log.i("TIMER LOOP",
                         String.valueOf(len[0]) +" "+String.valueOf(len[1]) +" "+String.valueOf(len[2]) +
-                                String.valueOf(len[3]) +" "+String.valueOf(len[4]) +" "+String.valueOf(len[5]) +
-                                String.valueOf(len[6]) +" "+String.valueOf(len[7])
-                );*/
+                                String.valueOf(len[3])
+                );
 
                 float phase=0;
                 int oldId=-1;
